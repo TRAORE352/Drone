@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projet [XXX] — Détection IA</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: white;
+      padding: 16px 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo-cercle {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .header-texte h1 { font-size: 17px; font-weight: 700; }
+    .header-texte p { font-size: 12px; color: #8892a4; margin-top: 1px; }
+
+    .badge-live {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff0f0;
+      color: #e53e3e;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .point-rouge {
+      width: 8px; height: 8px;
+      background: #e53e3e;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .contenu {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .stat-card .nombre {
+      font-size: 28px;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-card .label {
+      font-size: 11px;
+      color: #8892a4;
+      margin-top: 6px;
+    }
+
+    /* SECTION CAMÉRA */
+    .camera-section {
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+
+    .camera-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #f0f2f5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .camera-header h2 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    #btn-camera {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+
+    #btn-camera:active {
+      opacity: 0.8;
+    }
+
+    #btn-camera.actif {
+      background: linear-gradient(135deg, #e53e3e, #c53030);
+    }
+
+    #video-container {
+      position: relative;
+      display: none;
+    }
+
+    #video {
+      width: 100%;
+      max-height: 300px;
+      object-fit: cover;
+      display: block;
+    }
+
+    #canvas { display: none; }
+
+    .camera-info {
+      padding: 20px;
+      text-align: center;
+      color: #8892a4;
+      font-size: 13px;
+    }
+
+    /* RÉSULTAT DÉTECTION */
+    #resultat-detection {
+      display: none;
+      margin: 0 16px 16px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    #resultat-detection.defaut {
+      background: #fff0f0;
+      color: #e53e3e;
+      border: 1px solid #fed7d7;
+    }
+
+    #resultat-detection.normal {
+      background: #f0fff4;
+      color: #38a169;
+      border: 1px solid #c6f6d5;
+    }
+
+    /* ALERTES */
+    .section-titre {
+      font-size: 13px;
+      font-weight: 600;
+      color: #8892a4;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 14px;
+    }
+
+    #en-attente {
+      background: white;
+      border-radius: 20px;
+      padding: 40px 24px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    #en-attente .icone { font-size: 40px; margin-bottom: 12px; }
+    #en-attente h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+    #en-attente p { font-size: 13px; color: #8892a4; }
+
+    #alertes { display: flex; flex-direction: column; gap: 16px; }
+
+    .alerte-card {
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      animation: slideIn 0.4s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .alerte-photo {
+      width: 100%;
+      max-height: 200px;
+      object-fit: cover;
+    }
+
+    .alerte-body { padding: 14px 16px; }
+
+    .alerte-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .alerte-nom { font-size: 15px; font-weight: 700; }
+
+    .alerte-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #fff0f0;
+      color: #e53e3e;
+    }
+
+    .alerte-badge.bonne {
+      background: #f0fff4;
+      color: #38a169;
+    }
+
+    .alerte-meta {
+      display: flex;
+      gap: 16px;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #8892a4;
+    }
+
+    footer {
+      text-align: center;
+      padding: 32px 16px;
+      color: #c0c8d4;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-cercle">🚁</div>
+    <div class="header-texte">
+      <h1>système de dection intelligent</h1>
+      <p>Détection de pannes électriques</p>
+    </div>
+    <div class="badge-live">
+      <div class="point-rouge"></div>
+      EN DIRECT
+    </div>
+  </header>
+
+  <div class="contenu">
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="nombre" id="compteur">0</div>
+        <div class="label">Anomalies détectées</div>
+      </div>
+      <div class="stat-card">
+        <div class="nombre" id="derniere-conf">—</div>
+        <div class="label">Confiance</div>
+      </div>
+      <div class="stat-card">
+        <div class="nombre" id="derniere-heure">—</div>
+        <div class="label">Dernière heure</div>
+      </div>
+    </div>
+
+    <!-- SECTION CAMÉRA -->
+    <div class="camera-section">
+      <div class="camera-header">
+        <h2>📷 Tester avec ta caméra</h2>
+        <button id="btn-camera" onclick="toggleCamera()">
+          Activer la caméra
+        </button>
+      </div>
+      <div class="camera-info" id="camera-info">
+        Appuie sur "Activer la caméra" puis filme une ligne électrique
+      </div>
+      <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+      </div>
+      <div id="resultat-detection"></div>
+    </div>
+
+    <!-- HISTORIQUE ALERTES -->
+    <div class="section-titre">Historique des détections</div>
+
+    <div id="en-attente">
+      <div class="icone">🔍</div>
+      <h2>Système actif</h2>
+      <p>En attente de détection...</p>
+    </div>
+
+    <div id="alertes"></div>
+
+  </div>
+
+  <footer>
+    TRAORE Zozerigué & ALASSANI Yasmine — Institut 2iE
+  </footer>
+
+  <script>
+    const socket = io();
+    let compteur = 0;
+    let stream = null;
+    let intervalle = null;
+    let enAttente = false;
+
+    // ── Caméra ──────────────────────────────────────
+    async function toggleCamera() {
+      const btn = document.getElementById('btn-camera');
+      const container = document.getElementById('video-container');
+      const info = document.getElementById('camera-info');
+
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+          const video = document.getElementById('video');
+          video.srcObject = stream;
+          container.style.display = 'block';
+          info.style.display = 'none';
+          btn.textContent = '⏹ Arrêter';
+          btn.classList.add('actif');
+
+          // Capturer une image toutes les 2 secondes
+          intervalle = setInterval(capturerEtAnalyser, 2000);
+
+        } catch(e) {
+          info.textContent = "Impossible d'accéder à la caméra. Autorise l'accès dans ton navigateur.";
+        }
+      } else {
+        arreterCamera();
+      }
+    }
+
+    function arreterCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      if (intervalle) {
+        clearInterval(intervalle);
+        intervalle = null;
+      }
+      const btn = document.getElementById('btn-camera');
+      const container = document.getElementById('video-container');
+      const info = document.getElementById('camera-info');
+      const resultat = document.getElementById('resultat-detection');
+
+      container.style.display = 'none';
+      info.style.display = 'block';
+      info.textContent = "Appuie sur 'Activer la caméra' puis filme une ligne électrique";
+      btn.textContent = 'Activer la caméra';
+      btn.classList.remove('actif');
+      resultat.style.display = 'none';
+    }
+
+    function capturerEtAnalyser() {
+      if (enAttente) return;
+
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+
+      const imageData = canvas.toDataURL('image/jpeg', 0.8);
+      enAttente = true;
+
+      // Envoyer l'image au serveur pour analyse
+      socket.emit('analyser_image', { image: imageData });
+    }
+
+    // ── Recevoir le résultat d'analyse ──────────────
+    socket.on('resultat_analyse', function(data) {
+      enAttente = false;
+      const resultat = document.getElementById('resultat-detection');
+      resultat.style.display = 'block';
+
+      if (data.defaut && data.defaut !== 'normal') {
+        resultat.className = 'defaut';
+        resultat.textContent = `⚠️ ${data.defaut} détecté — ${data.confiance}% de confiance`;
+      } else {
+        resultat.className = 'normal';
+        resultat.textContent = '✅ Aucune anomalie détectée';
+      }
+    });
+
+    // ── Recevoir les alertes ─────────────────────────
+    socket.on('nouvelle_alerte', function(data) {
+      document.getElementById('en-attente').style.display = 'none';
+
+      compteur++;
+      document.getElementById('compteur').textContent = compteur;
+      document.getElementById('derniere-conf').textContent = data.confiance + '%';
+      document.getElementById('derniere-heure').textContent = data.heure;
+
+      const estCritique = data.defaut.toLowerCase().includes('bad');
+
+      const card = document.createElement('div');
+      card.className = 'alerte-card';
+      card.innerHTML = `
+        <img class="alerte-photo"
+             src="data:image/jpeg;base64,${data.image}"
+             alt="Détection">
+        <div class="alerte-body">
+          <div class="alerte-top">
+            <div class="alerte-nom">${data.defaut.replace(/_/g, ' ')}</div>
+            <div class="alerte-badge ${estCritique ? '' : 'bonne'}">
+              ${estCritique ? '⚠️' : '✅'} ${data.confiance}%
+            </div>
+          </div>
+          <div class="alerte-meta">
+            <div class="meta-item"><span>🕐</span><span>${data.heure}</span></div>
+            <div class="meta-item"><span>📍</span><span>Ligne inspectée</span></div>
+          </div>
+        </div>
+      `;
+
+      const alertes = document.getElementById('alertes');
+      alertes.insertBefore(card, alertes.firstChild);
+      while (alertes.children.length > 10) alertes.removeChild(alertes.lastChild);
+    });
+  </script>
+
+</body>
+</html>
